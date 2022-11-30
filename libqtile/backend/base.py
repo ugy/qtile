@@ -59,7 +59,7 @@ class Core(CommandObject, metaclass=ABCMeta):
         """Set the current desktops of the window manager"""
 
     @abstractmethod
-    def get_screen_info(self) -> list[tuple[int, int, int, int]]:
+    def get_screen_info(self) -> list[tuple[int, int, int, int, str]]:
         """Get the screen information"""
 
     @abstractmethod

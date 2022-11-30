@@ -22,7 +22,7 @@
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS R
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -216,8 +216,8 @@ XCB_CONN_ERRORS = {
 
 class MaskMap:
     """
-    A general utility class that encapsulates the way the bitmask/listofvalue idiom
-    works in X protocol. It understands a special attribute _maskvalue on
+    A general utility class that encapsulates the way the bitmask/listofvalue
+    idiom works in X protocol. It understands a special attribute _maskvalue on
     objects, which will be used instead of the object value if present.
     This lets us pass in a Font object, rather than Font.fid, for example.
     """
@@ -328,7 +328,8 @@ class Screen(_Wrapper):
             return desired_depth, self._visuals[desired_depth]
 
         logger.info(
-            "%s bit colour depth not available. Falling back to root depth: %s.",
+            "%s bit colour depth not available."
+            "Falling back to root depth: %s.",
             desired_depth,
             self.root_depth,
         )
@@ -359,12 +360,13 @@ class PseudoScreen:
     rectangular sections of an actual Screen.
     """
 
-    def __init__(self, conn, x, y, width, height):
+    def __init__(self, conn, x, y, width, height, name):
         self.conn = conn
         self.x = x
         self.y = y
         self.width = width
         self.height = height
+        self.name = name
 
 
 class Colormap:
@@ -377,7 +379,9 @@ class Colormap:
         Flexible color allocation.
         """
         try:
-            return self.conn.conn.core.AllocNamedColor(self.cid, len(color), color).reply()
+            return self.conn.conn.core.AllocNamedColor(
+                self.cid, len(color), color
+            ).reply()
         except xcffib.xproto.NameError:
 
             def x8to16(i):
@@ -406,20 +410,45 @@ class Xinerama:
 
 class RandR:
     def __init__(self, conn):
+        self.conn = conn
         self.ext = conn.conn(xcffib.randr.key)
-        self.ext.SelectInput(conn.default_screen.root.wid, xcffib.randr.NotifyMask.ScreenChange)
+        self.ext.SelectInput(
+            conn.default_screen.root.wid, xcffib.randr.NotifyMask.ScreenChange
+        )
 
     def query_crtcs(self, root):
         crtc_list = []
         for crtc in self.ext.GetScreenResources(root).reply().crtcs:
             crtc_info = self.ext.GetCrtcInfo(crtc, xcffib.CurrentTime).reply()
+            logger.info("crtc: %s", crtc_info.outputs)
+            
+
+        monitors = self.ext.GetMonitors(root, False).reply()
+        for m, monitor in enumerate(monitors.monitors):
             crtc_dict = {
-                "x": crtc_info.x,
-                "y": crtc_info.y,
-                "width": crtc_info.width,
-                "height": crtc_info.height,
+                "x": monitor.x,
+                "y": monitor.y,
+                "width": monitor.width,
+                "height": monitor.height,
+                "name": self.conn.atoms.get_name(monitor.name),
             }
             crtc_list.append(crtc_dict)
+        # screens = self.ext.GetScreenResources(root).reply()
+        # for output_number in screens.outputs:
+        #     output = self.ext.GetOutputInfo(output_number, screens.config_timestamp).reply()
+        #     if output.connection != xcffib.randr.Connection().Connected:
+        #         continue
+        #     logger.info("Output %s", bytes(output.name).decode())
+        #     for crtc in output.crtcs:
+        #         crtc_info = self.ext.GetCrtcInfo(crtc, xcffib.CurrentTime).reply()
+        #         logger.info("found crtc: %s", f"{crtc_info.x}/{crtc_info.y} {crtc_info.width}x{crtc_info.height}, outputs: {crtc_info.outputs}")
+        #         crtc_dict = {
+        #             "x": crtc_info.x,
+        #             "y": crtc_info.y,
+        #             "width": crtc_info.width,
+        #             "height": crtc_info.height,
+        #         }
+        #         crtc_list.append(crtc_dict)
         return crtc_list
 
 
@@ -433,11 +462,15 @@ class XFixes:
     def __init__(self, conn):
         self.conn = conn
         self.ext = conn.conn(xcffib.xfixes.key)
-        self.ext.QueryVersion(xcffib.xfixes.MAJOR_VERSION, xcffib.xfixes.MINOR_VERSION)
+        self.ext.QueryVersion(
+            xcffib.xfixes.MAJOR_VERSION, xcffib.xfixes.MINOR_VERSION
+        )
 
     def select_selection_input(self, window, selection="PRIMARY"):
         _selection = self.conn.atoms[selection]
-        self.conn.xfixes.ext.SelectSelectionInput(window.wid, _selection, self.selection_mask)
+        self.conn.xfixes.ext.SelectSelectionInput(
+            window.wid, _selection, self.selection_mask
+        )
 
 
 class NetWmState:
@@ -465,7 +498,9 @@ class NetWmState:
             self.atom = atom
 
         value = bool(value)
-        reply = list(xcbq_win.get_property("_NET_WM_STATE", "ATOM", unpack=int))
+        reply = list(
+            xcbq_win.get_property("_NET_WM_STATE", "ATOM", unpack=int)
+        )
         is_set = atom in reply
         if is_set and not value:
             reply.remove(atom)
@@ -528,17 +563,7 @@ class Connection:
     @property
     def pseudoscreens(self):
         pseudoscreens = []
-        if hasattr(self, "xinerama"):
-            for i, s in enumerate(self.xinerama.query_screens()):
-                scr = PseudoScreen(
-                    self,
-                    s.x_org,
-                    s.y_org,
-                    s.width,
-                    s.height,
-                )
-                pseudoscreens.append(scr)
-        elif hasattr(self, "randr"):
+        if hasattr(self, "randr"):
             for i in self.randr.query_crtcs(self.screens[0].root.wid):
                 scr = PseudoScreen(
                     self,
@@ -546,6 +571,18 @@ class Connection:
                     i["y"],
                     i["width"],
                     i["height"],
+                    i["name"]
+                )
+                pseudoscreens.append(scr)
+        elif hasattr(self, "xinerama"):
+            for i, s in enumerate(self.xinerama.query_screens()):
+                scr = PseudoScreen(
+                    self,
+                    s.x_org,
+                    s.y_org,
+                    s.width,
+                    s.height,
+                    f"xinerama-{i}"
                 )
                 pseudoscreens.append(scr)
         return pseudoscreens
@@ -581,7 +618,9 @@ class Connection:
     def refresh_modmap(self):
         reply = self.conn.core.GetModifierMapping().reply()
         modmap = {}
-        names = (repeat(name, reply.keycodes_per_modifier) for name in ModMasks)
+        names = (
+            repeat(name, reply.keycodes_per_modifier) for name in ModMasks
+        )
         for name, keycode in zip(chain.from_iterable(names), reply.keycodes):
             value = modmap.setdefault(name, [])
             value.append(keycode)
@@ -598,16 +637,22 @@ class Connection:
         return self.sym_to_codes.get(keysym, [0])
 
     def keycode_to_keysym(self, keycode, modifier):
-        if keycode >= len(self.code_to_syms) or modifier >= len(self.code_to_syms[keycode]):
+        if keycode >= len(self.code_to_syms) or modifier >= len(
+            self.code_to_syms[keycode]
+        ):
             return 0
         return self.code_to_syms[keycode][modifier]
 
     def create_window(self, x, y, width, height, desired_depth=32):
-        depth, visual = self.default_screen._get_depth_and_visual(desired_depth)
+        depth, visual = self.default_screen._get_depth_and_visual(
+            desired_depth
+        )
 
         wid = self.conn.generate_id()
 
-        value_mask = CW.BackPixmap | CW.BorderPixel | CW.EventMask | CW.Colormap
+        value_mask = (
+            CW.BackPixmap | CW.BorderPixel | CW.EventMask | CW.Colormap
+        )
         values = [
             xcffib.xproto.BackPixmap._None,
             0,
@@ -653,7 +698,8 @@ class Connection:
 
     def extensions(self):
         return set(
-            i.name.to_string().lower() for i in self.conn.core.ListExtensions().reply().names
+            i.name.to_string().lower()
+            for i in self.conn.core.ListExtensions().reply().names
         )
 
     def fixup_focus(self):
@@ -682,7 +728,9 @@ class Painter:
         self.setup = self.conn.get_setup()
         self.screens = [Screen(self, i) for i in self.setup.roots]
         self.default_screen = self.screens[self.conn.pref_screen]
-        self.conn.core.SetCloseDownMode(xcffib.xproto.CloseDown.RetainPermanent)
+        self.conn.core.SetCloseDownMode(
+            xcffib.xproto.CloseDown.RetainPermanent
+        )
         self.atoms = AtomCache(self)
         self.width = -1
         self.height = -1
@@ -751,7 +799,9 @@ class Painter:
                     context.scale(width_ratio)
                 else:
                     height_ratio = screen.height / image_h
-                    context.translate(-(image_w * height_ratio - screen.width) // 2, 0)
+                    context.translate(
+                        -(image_w * height_ratio - screen.width) // 2, 0
+                    )
                     context.scale(height_ratio)
             elif mode == "stretch":
                 context.scale(
@@ -782,7 +832,9 @@ class Painter:
         self.conn.core.ChangeWindowAttributes(
             self.default_screen.root.wid, CW.BackPixmap, [root_pixmap]
         )
-        self.conn.core.ClearArea(0, self.default_screen.root.wid, 0, 0, self.width, self.height)
+        self.conn.core.ClearArea(
+            0, self.default_screen.root.wid, 0, 0, self.width, self.height
+        )
         self.conn.flush()
 
     def __del__(self):

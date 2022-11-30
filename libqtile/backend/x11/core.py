@@ -174,8 +174,8 @@ class Core(base.Core):
         self.qtile = None
         self.conn.finalize()
 
-    def get_screen_info(self) -> list[tuple[int, int, int, int]]:
-        info = [(s.x, s.y, s.width, s.height) for s in self.conn.pseudoscreens]
+    def get_screen_info(self) -> list[tuple[int, int, int, int, str]]:
+        info = [(s.x, s.y, s.width, s.height, s.name) for s in self.conn.pseudoscreens]
 
         if not info:
             info.append(
@@ -184,6 +184,7 @@ class Core(base.Core):
                     0,
                     self.conn.default_screen.width_in_pixels,
                     self.conn.default_screen.height_in_pixels,
+                    "screen0"
                 )
             )
 

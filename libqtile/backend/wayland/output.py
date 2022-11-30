@@ -242,9 +242,12 @@ class Output(HasListeners):
                 self.renderer.render_texture_with_matrix(texture, matrix, 1)
                 icon.surface.send_frame_done(now)
 
-    def get_geometry(self) -> tuple[int, int, int, int]:
+    def get_info(self) -> tuple[int, int, int, int, str]:
+        "Return screen position, dimmension and name"
         width, height = self.wlr_output.effective_resolution()
-        return int(self.x), int(self.y), width, height
+        name = "toto"
+        # name = self.wlr_output.name
+        return int(self.x), int(self.y), width, height, name
 
     def organise_layers(self) -> None:
         """Organise the positioning of layer shell surfaces."""

@@ -386,6 +386,7 @@ class Screen(CommandObject):
         y: int | None = None,
         width: int | None = None,
         height: int | None = None,
+        name: str | None = None,
     ) -> None:
 
         self.top = top

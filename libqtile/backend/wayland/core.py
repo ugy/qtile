@@ -1143,9 +1143,9 @@ class Core(base.Core, wlrq.HasListeners):
         else:
             self.idle.set_enabled(self.seat, True)
 
-    def get_screen_info(self) -> list[tuple[int, int, int, int]]:
+    def get_screen_info(self) -> list[tuple[int, int, int, int, str]]:
         """Get the screen information"""
-        return [screen.get_geometry() for screen in self.outputs if screen.wlr_output.enabled]
+        return [screen.get_info() for screen in self.outputs if screen.wlr_output.enabled]
 
     def grab_key(self, key: config.Key | config.KeyChord) -> tuple[int, int]:
         """Configure the backend to grab the key event"""

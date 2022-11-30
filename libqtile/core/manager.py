@@ -330,15 +330,15 @@ class Qtile(CommandObject):
         else:
             # Alias screens with the same x and y coordinates, taking largest
             xywh = {}  # type: dict[tuple[int, int], tuple[int, int]]
-            for sx, sy, sw, sh in self.core.get_screen_info():
+            for sx, sy, sw, sh, name in self.core.get_screen_info():
                 pos = (sx, sy)
                 width, height = xywh.get(pos, (0, 0))
-                xywh[pos] = (max(width, sw), max(height, sh))
+                xywh[pos] = (max(width, sw), max(height, sh), name)
 
-            screen_info = [(x, y, w, h) for (x, y), (w, h) in xywh.items()]
+            screen_info = [(x, y, w, h, name) for (x, y), (w, h, name) in xywh.items()]
             config = self.config.screens
 
-        for i, (x, y, w, h) in enumerate(screen_info):
+        for i, (x, y, w, h, _) in enumerate(screen_info):
             if i + 1 > len(config):
                 scr = Screen()
             else:
@@ -1684,3 +1684,10 @@ class Qtile(CommandObject):
     def run_extension(self, extension: _Extension) -> None:
         """Run extensions"""
         extension.run()
+
+    @expose_command()
+    def get_outputs(self) -> list[tuple[int, int, int, int, str]]:
+        """Return the list of outputs
+        """
+
+        return self.core.get_screen_info()
