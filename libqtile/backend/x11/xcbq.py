@@ -416,12 +416,10 @@ class RandR:
             conn.default_screen.root.wid, xcffib.randr.NotifyMask.ScreenChange
         )
 
-    def query_crtcs(self, root):
+    def query_outputs(self, root):
         crtc_list = []
         for crtc in self.ext.GetScreenResources(root).reply().crtcs:
             crtc_info = self.ext.GetCrtcInfo(crtc, xcffib.CurrentTime).reply()
-            logger.info("crtc: %s", crtc_info.outputs)
-            
 
         monitors = self.ext.GetMonitors(root, False).reply()
         for m, monitor in enumerate(monitors.monitors):
@@ -433,22 +431,6 @@ class RandR:
                 "name": self.conn.atoms.get_name(monitor.name),
             }
             crtc_list.append(crtc_dict)
-        # screens = self.ext.GetScreenResources(root).reply()
-        # for output_number in screens.outputs:
-        #     output = self.ext.GetOutputInfo(output_number, screens.config_timestamp).reply()
-        #     if output.connection != xcffib.randr.Connection().Connected:
-        #         continue
-        #     logger.info("Output %s", bytes(output.name).decode())
-        #     for crtc in output.crtcs:
-        #         crtc_info = self.ext.GetCrtcInfo(crtc, xcffib.CurrentTime).reply()
-        #         logger.info("found crtc: %s", f"{crtc_info.x}/{crtc_info.y} {crtc_info.width}x{crtc_info.height}, outputs: {crtc_info.outputs}")
-        #         crtc_dict = {
-        #             "x": crtc_info.x,
-        #             "y": crtc_info.y,
-        #             "width": crtc_info.width,
-        #             "height": crtc_info.height,
-        #         }
-        #         crtc_list.append(crtc_dict)
         return crtc_list
 
 
@@ -564,7 +546,7 @@ class Connection:
     def pseudoscreens(self):
         pseudoscreens = []
         if hasattr(self, "randr"):
-            for i in self.randr.query_crtcs(self.screens[0].root.wid):
+            for i in self.randr.query_outputs(self.screens[0].root.wid):
                 scr = PseudoScreen(
                     self,
                     i["x"],
